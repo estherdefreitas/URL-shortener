@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener</title>
+</head>
+<body>
+    <h1>URL Shortener</h1>
+    <form id="shortenForm">
+        <label for="url">URL:</label><br>
+        <input type="text" id="url" name="url" required><br><br>
+        <button type="submit">Shorten</button>
+    </form>
+
+    <div id="shortenedUrl"></div>
+
+    <script>
+        document.getElementById('shortenForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            var formData = new FormData(this);
+
+            fetch('/shorten', {
+                method: 'POST',
+                body: JSON.stringify({ "url": formData.get('url') }),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                var shortenedUrl = 'http://' + data.shortened_url;
+                document.getElementById('shortenedUrl').innerHTML = `Shortened URL: <a href="${shortenedUrl}">${shortenedUrl}</a>`;
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>

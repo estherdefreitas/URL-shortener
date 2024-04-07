@@ -1,11 +1,21 @@
 # URL-shortener
+***
+Projeto da disciplina de Fundamentos de Redes de Computadores, do curso
+Bacharelado em Sistemas de Informação - 
+Instituto Federal de Alagoas.
 
-# Arquivos servidor.py e cliente.py
-# Criação de scripts para conexão cliente-servidor usando sockets
-# baseada nos videos: https://www.youtube.com/watch?v=v3zVT4HJxYI
-#                     https://www.youtube.com/watch?v=vbUuJ2_6wqs 
+**Equipe:**
+ - [Esther de Freitas](github.com/estherdefreitas)
+ - [Rodrigo Farias](github.com/rodrigo-farias10)
+ - [Naomy](github.com/nlas2)
+ - [Euber](github.com/euberskills)
 
-# Arquivo conversor_url.py
+**Objetivo:** construir o próprio serviço de encurtamento de URL desenvolvendo a própria comunicação por sockets 
 
-# Próximos passos - integrar conexão com sockets e conversor_url
-# e fazer correspondência com os requisitos do desafio
+**Linguagens utilizadas:** 
+ - Backend: Python
+ - Frontend: ?
+
+Arquivos main.py e index.html
+
+
