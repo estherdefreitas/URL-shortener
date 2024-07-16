@@ -14,7 +14,7 @@ Instituto Federal de Alagoas.
 
 **Linguagens utilizadas:** 
  - Backend: Python
- - Frontend: ?
+ - Frontend: html, css
 
 Arquivos main.py e index.html
 
