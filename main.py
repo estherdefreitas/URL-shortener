@@ -1,100 +1,123 @@
-import hashlib
-import json
-import socket
+import hashlib  # Biblioteca para criar hashes (resumos) de strings
+import json  # Biblioteca para manipulação de dados JSON
+import socket  # Biblioteca para comunicação de rede via sockets
 
-url_shortener = {}
+url_shortener = {}  # Dicionário para armazenar os pares de hash e URLs originais
+server_ip = '127.0.0.1'  # IP do servidor (localhost)
+server_port = 8080  # Porta do servidor
 
+def handle_request(data):
+    # Decodifica os dados recebidos e separa-os em linhas
+    request = data.decode('utf-8').split("\r\n")
+    # Pega a primeira linha da requisição (linha de comando)
+    request_line = request[0].split(" ")
+    # Separa o método HTTP (POST, GET, etc.) e o caminho solicitado
+    method = request_line[0]
+    path = request_line[1]
 
-def generate_hash(url):
-    hash_object = hashlib.sha256(url.encode())
-    return hash_object.hexdigest()[:8]
+    # Log de método e caminho
+    print(f"Method: {method}, Path: {path}")
 
+    # Responde às requisições OPTIONS para CORS (Cross-Origin Resource Sharing)
+    if method == "OPTIONS":
+        response = (
+            "HTTP/1.1 200 OK\r\n"
+            "Access-Control-Allow-Origin: *\r\n"
+            "Access-Control-Allow-Methods: POST, GET, OPTIONS\r\n"
+            "Access-Control-Allow-Headers: Content-Type\r\n\r\n"
+        )
+        return response
 
-def shorten_url(long_url):
-    url_hash = generate_hash(long_url)
-    short_url = f'127.0.0.1:8080/{url_hash}'
-    url_shortener[url_hash] = {
-        'long_url': long_url,
-        'short_url': short_url
-    }
-    return short_url
+    # Lida com requisições POST para encurtar URLs
+    if method == "POST" and path == "/shorten":
+        # Encontra o comprimento do conteúdo
+        content_length = int([x for x in request if x.startswith("Content-Length:")][0].split(": ")[1])
+        # Obtém o corpo da requisição
+        body = data.decode('utf-8').split("\r\n\r\n")[1]
+        # Converte o corpo de JSON para dicionário Python
+        json_body = json.loads(body)
+        # Obtém a URL original do corpo da requisição
+        original_url = json_body['url']
 
+        # Adiciona "http://" à URL se não estiver presente
+        if not original_url.startswith("http://") and not original_url.startswith("https://"):
+            original_url = "http://" + original_url
 
-def handle_request(client_socket):
-    request_data = client_socket.recv(1024).decode()
-    if request_data:
-        lines = request_data.split('\n')
-        request_line = lines[0]
-        method, path, _ = request_line.split(' ')
+        # Cria um hash MD5 da URL e pega os primeiros 6 caracteres
+        url_hash = hashlib.md5(original_url.encode()).hexdigest()[:6]
+        # Cria a URL encurtada usando o hash
+        shortened_url = f"http://{server_ip}:{server_port}/{url_hash}"
+        
+        # Armazena o par hash-URL original no dicionário
+        url_shortener[url_hash] = original_url
 
-        if method == 'GET':
-            if path == '/':
-                with open('index.html', 'r') as file:
-                    response_body = file.read()
-                response_headers = f'HTTP/1.1 200 OK\nContent-Length: {len(response_body)}\n\n'
-                response = response_headers + response_body
-                client_socket.send(response.encode())
-            elif path[1:] in url_shortener:
-                long_url = url_shortener[path[1:]]['long_url']
-                response_headers = f'HTTP/1.1 302 Found\nLocation: {long_url}\n\n'
-                client_socket.send(response_headers.encode())
-            else:
-                response = 'HTTP/1.1 404 Not Found\n\n'
-                client_socket.send(response.encode())
+        # Log de armazenamento
+        print(f"Storing hash: {url_hash} -> {original_url}")
+        
+        # Prepara a resposta JSON com a URL encurtada
+        response_body = json.dumps({'shortened_url': shortened_url})
+        response = (
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/json\r\n"
+            "Access-Control-Allow-Origin: *\r\n"
+            f"Content-Length: {len(response_body)}\r\n\r\n{response_body}"
+        )
+        return response
 
-        elif method == 'POST':
-            if path == '/shorten':
-                try:
-                    body_index = lines.index('\r')
-                except ValueError:
-                    body_index = None
+    # Lida com requisições GET para redirecionar para a URL original
+    elif method == "GET" and path.startswith("/"):
+        # Extrai o hash da URL solicitada
+        url_hash = path[1:]
+        # Log de recuperação
+        print(f"Retrieving for hash: {url_hash}")
+        # Verifica se o hash existe no dicionário
+        if url_hash in url_shortener:
+            original_url = url_shortener[url_hash]
+            # Log de URL encontrada
+            print(f"Found original URL: {original_url}")
+            # Resposta de redirecionamento 301 para a URL original
+            response = (
+                "HTTP/1.1 301 Moved Permanently\r\n"
+                f"Location: {original_url}\r\n"
+                "Access-Control-Allow-Origin: *\r\n\r\n"
+            )
+        else:
+            # Log de URL não encontrada
+            print("URL not found")
+            # Resposta de erro 404 se o hash não for encontrado
+            response = (
+                "HTTP/1.1 404 Not Found\r\n"
+                "Content-Type: text/plain\r\n"
+                "Access-Control-Allow-Origin: *\r\n"
+                "Content-Length: 13\r\n\r\nURL not found"
+            )
+        return response
 
-                if body_index is not None and body_index + 1 < len(lines):
-                    request_body = '\n'.join(lines[body_index + 1:])
-                    if request_body.strip():
-                        json_data = json.loads(request_body)
-                        long_url = json_data.get('url')
-                        if long_url:
-                            if 'http' not in long_url[:4]:
-                                long_url = 'https://' + long_url
-                            response_data = json.dumps({'shortened_url': shorten_url(long_url)})
-                            response_headers = f'HTTP/1.1 200 OK\nContent-Length: {len(response_data)}\n\n'
-                            response = response_headers + response_data
-                            client_socket.send(response.encode())
-                            return
-                    else:
-                        response = 'HTTP/1.1 400 Bad Request\n\n'
-                else:
-                    response = 'HTTP/1.1 400 Bad Request\n\n'
-                    client_socket.send(response.encode())
-            else:
-                response = 'HTTP/1.1 404 Not Found\n\n'
-                client_socket.send(response.encode())
+    # Resposta de erro 404 para outras requisições
+    return "HTTP/1.1 404 Not Found\r\n\r\n"
 
-    client_socket.close()
-
-
-def main():
-    host = '127.0.0.1'
-    port = 8080
-
+def start_server():
+    # Cria um socket TCP/IP
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind((host, port))
+    # Associa o socket ao endereço e porta especificados
+    server_socket.bind(('0.0.0.0', server_port))
+    # Começa a escutar por conexões de entrada
     server_socket.listen(1)
+    print(f"Server listening on port {server_port}")
+    
+    while True:
+        # Aceita uma nova conexão
+        client_socket, addr = server_socket.accept()
+        # Recebe dados do cliente
+        data = client_socket.recv(1024)
+        if data:
+            # Processa a requisição e obtém a resposta
+            response = handle_request(data)
+            # Envia a resposta para o cliente
+            client_socket.sendall(response.encode('utf-8'))
+        # Fecha a conexão com o cliente
+        client_socket.close()
 
-    print(f'Server listening on {host}:{port}...')
-
-    try:
-        while True:
-            client_socket, client_address = server_socket.accept()
-            print(f'Connection from {client_address}')
-            handle_request(client_socket)
-    except KeyboardInterrupt:
-        print('Server shutting down...')
-    finally:
-        server_socket.close()
-
-
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    # Inicia o servidor
+    start_server()
