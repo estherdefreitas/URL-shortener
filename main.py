@@ -99,8 +99,9 @@ def handle_request(data):
 def start_server():
     # Cria um socket TCP/IP
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     # Associa o socket ao endereço e porta especificados
-    server_socket.bind(('0.0.0.0', server_port))
+    server_socket.bind(('127.0.0.1', server_port))
     # Começa a escutar por conexões de entrada
     server_socket.listen(1)
     print(f"Server listening on port {server_port}")
